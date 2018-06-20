@@ -1,0 +1,46 @@
+---
+- hosts: apic
+  vars: # do not '| unique'
+    tenant: '{{ tns[ tn ] }}'
+    aps: '{{ tenant.keys() | map("extract", tenant) | list }}'
+    et: ' {% for ap in aps -%}{{ ap | map("extract", ap) | list }},{%- endfor -%}' # Do not strip initial whitespaces to disable JSON recognitions.
+    es: '[ {{ et[:-1] | trim }} ]' # Without this precise trick single container might result in tuple because trailing comma!
+    ps: '{{ es | flatten | map(attribute="phy") | map("extract", phys) | list }}'
+    ds: '{{ es | flatten | map(attribute="dom") | map("extract", doms) | list }}'
+  tasks:
+    - aci_interface_policy_leaf_policy_group: #&ifpg
+        <<: &st-ol
+          state: '{{ intent }}'
+          output_level: '{{ output_level }}'
+        policy_group: '{{ item.0.ifpg }}' #&pg 
+        aep: '{{ item.1.aep }}'
+        lag_type: leaf
+        lldp_policy: LLDP:En
+        mcp_policy: MCP:En
+      args: '{{ aci_vars }}'
+      with_together:
+        - '{{ ps }}'
+        - '{{ ds }}'
+    - aci_interface_policy_leaf_profile: #&iflfp
+        <<: *st-ol
+        leaf_interface_profile: '{{ item.ifp }}'
+      args: '{{ aci_vars }}'
+      with_list: '{{ ps }}'
+    - aci_access_port_to_interface_policy_leaf_profile:
+        <<: *st-ol
+        leaf_interface_profile: '{{ item.ifp }}'
+        access_port_selector: 1.{{ item.prt }} # 1. for baby switch
+        leaf_port_blk: 1.{{ item.prt }} # single, sep with .. for range
+        from: '{{ item.prt }}'
+        to: '{{ item.prt }}'
+        policy_group: '{{ item.ifpg }}'
+      args: '{{ aci_vars }}'
+      with_list: '{{ ps }}'
+    #- aci_switch_policy_leaf_profile: TBD
+    #- aci_switch_leaf_selector: TBD
+    - aci_interface_selector_to_switch_policy_leaf_profile:
+        <<: *st-ol
+        interface_selector: '{{ item.ifp }}' # Why not leaf_interface_profile, FCS.
+        leaf_profile: '{{ item.swp }}'
+      args: '{{ aci_vars }}'
+      with_list: '{{ ps }}'

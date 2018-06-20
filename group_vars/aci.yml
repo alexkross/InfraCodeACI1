@@ -1,0 +1,8 @@
+# See also all.yml
+
+aci_vars:
+  use_proxy: no
+  validate_certs: False
+  hostname: '{{ ansible_host }}'
+  username: '{{ ansible_user }}'
+  password: '{{ pwd }}'

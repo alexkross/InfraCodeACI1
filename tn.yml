@@ -1,0 +1,24 @@
+---
+- hosts: apic
+  vars:
+    tnn: '{{ tn_pref }}{{ tn }}'
+    vrfn: '{{ pref.vrf }}{{ tn }}'
+  tasks:
+    - aci_tenant: &tn
+        tenant: '{{ tnn }}'
+        state: '{{ intent }}'
+        output_level: '{{ output_level }}'
+      args: '{{ aci_vars }}'
+    - aci_ap:
+        <<: *tn
+        ap: '{{ pref.ap }}{{ item.key }}'
+      args: '{{ aci_vars }}'
+      with_dict: '{{ tns[ tn ] }}'
+    - aci_vrf:
+        <<: *tn
+        vrf: '{{ vrfn }}'
+      args: '{{ aci_vars }}'
+    - include_tasks: epg.yml
+      with_dict: '{{ tns[ tn ] }}'
+      loop_control:
+        loop_var: oitem

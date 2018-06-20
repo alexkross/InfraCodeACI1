@@ -1,0 +1,22 @@
+---
+- hosts: bm1
+  vars:
+    aps: '{{ tns[ tn ] }}'
+    data: '{{ aps[ ap ][ epg ] }}' # do not reuse var name 'epg', bcs infinite recurion
+    test: '{{ tsts[ data.tst ] }}'
+    ip: '{{ test.ip }}' # or: '{%- for i, a in ifcs if a == ip -%}{ "{{ a }}": "{{ i }}" }{%- endfor -%}'
+    pip: '{{ tsts[ aps[ test.pap ][ test.pepg ].tst ].ip }}'
+  tasks:
+    - command: ip -br -4 addr
+      register: reg
+    - set_fact: # one more step because cannot directly get correct json with regex_replace for some weird reason
+        ifcs: '{{ ifcs | default([]) + [ (item | regex_replace("^(\w+)\s+\w+\s+(\d+\.\d+.\d+.\d+)/.*$", "\1 \2")).split() ] }}'
+      with_list: '{{ reg.stdout_lines }}'
+    - name: Test from {{ ip }} to {{ pip }}
+      vars:
+        eth: '{%- for i, a in ifcs if a == ip -%}{{ i }}{%- endfor -%}'
+      command:
+        ping -q -c 10000 -A -M do -s 8972 -I {{ eth }} {{ pip }}
+      register: reg
+    - debug:
+        msg: 'Stats:\n{{ reg.stdout_lines[-2::] | join("\n") }}'

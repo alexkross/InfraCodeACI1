@@ -1,0 +1,105 @@
+---
+- hosts: bm1
+  vars:
+    aps: '{{ tns[ tn ] }}'
+    keys:
+      - chassis.name
+      - chassis.descr
+      - port.local
+      - port.descr
+    uplinks: '{ {% for n in nics -%} "{{ n }}": {}{%- if not loop.last -%}, {% endif -%} {%- endfor %} }'
+  tasks:
+    - name: Complete clean up for all interfaces except management
+      shell: | # Quick and dirty, non-idempotent. TBD.
+        for i in $(seq 1 6); do
+          ip rule | egrep "^[[:digit:]]{2,3}:" | cut -f 2 -d : | xargs -n 1 -i sh -c "ip rule del {}"
+          ip -br link show type vrf | cut -f 1 -d ' ' | xargs -n 1 -i ip link del \{\} type vrf
+          ip -4 addr flush dev eth$i
+          ip link set group 1 down
+          ip link set eth$i group default
+        done
+      ignore_errors: yes
+      #when: tn_pref == "Tst" # kills Prd too! Static routes injection fails anyway despite different VRFs.
+    - name: Prepare LLDP
+      systemd:
+        name: lldpd
+        state: started
+    - name: Getting group 1
+      command:
+        ip link list group 1
+      register: gr1
+    - name: Setting group 1
+      command:
+        ip link set {{ item }} group 1
+      with_list: '{{ nics }}'
+    - name: Brinning group 1 up
+      command:
+        ip link set group 1 up
+    - name: Pause for a 15 seconds (7 seconds is not enough. PortFast/EdgePortType should be considered)
+      pause: seconds=15
+    - name: Getting neighbours with shell, not comamnd, to filter earlier
+      shell: lldpctl -f keyvalue show neighbors ports {{ nics | join( " " ) }} | egrep -v "^ *lldp\\.eth.+\\.unknown-tlvs\\.unknown-tlv"
+      register: nei
+    - set_fact:
+        links: "{{ links | default([]) + [ item | regex_replace('^lldp\\.(eth\\d+)\\.(.+)=(.+$)', '\"dev\": \"\\1\", \"key\": \"\\2\", \"val\": \"\\3\"') ] }}"
+      # Does not help to shut up much: when: not item | regex_search('^lldp\.eth\d+\.unknown-tlvs\.unknown-tlv')
+      with_list: '{{ nei.stdout_lines }}'
+      no_log: true
+    #- name: Set data assoc. with uplinks
+    - name: Fill in uplinks data.
+      vars:
+        tmp1: '{{ "[ { " ~ " }, { ".join( links ) ~ " } ]" }}'
+        tmp2: '{{ tmp1 | selectattr( "key", "match", keys | join("|") ) | list }}'
+      set_fact: 
+        uplinks: '{{ uplinks | combine({ item.dev: uplinks[item.dev] | combine({ item.key: item.val }) }) }}'
+      with_list: '{{ tmp2 }}'
+    - set_fact:
+        paths: '{{ paths | default({}) | combine( {item.value["port.descr"]: item.key} ) }}'
+      when: item.value
+      with_dict: '{{ uplinks }}'
+    - name: Set data assoc. with interfaces
+      vars:
+        collected: |
+          [ {% for ap in aps -%}
+              {%- for epg in aps[ ap ] -%}
+                {%- set tepg = aps[ ap ][ epg ] -%}
+                {%- set phy = phys[ tepg.phy ] -%}
+                {%- set tst = tsts[ tepg.tst ] -%}
+                {%- set pepg = aps[ tst.pap ][ tst.pepg ] -%}
+                {%- set ptst = tsts[ pepg.tst ] -%}
+                { {%- for attr in phy -%}
+                    "{{ attr }}": "{{ phy[ attr ] }}",
+                  {%- endfor -%}
+                  "msk": "{{ tepg.msk }}",
+                  "gw": "{{ tepg.gw }}",
+                  "ip": "{{ tst.ip }}",
+                  "pmsk": "{{ pepg.msk }}",
+                  "pip": "{{ ptst.ip }}",
+                  "path": "topology/pod-{{ phy.pod }}/paths-{{ phy.lf }}/pathep-[eth1/{{ phy.prt }}]" }
+                {%- if not loop.last -%}, {%- endif -%}
+              {%- endfor -%}
+            {%- endfor %} ]
+      set_fact:
+        ifcs: '{{ ifcs | default({}) | combine( { paths[ item.path ]: item } ) }}'
+      with_list: '{{ collected }}'
+    - command: ip link set group 1 mtu 9000
+    - name: Set ip address
+      command:
+        ip address add {{ item.value.ip }}/{{ item.value.msk }} dev {{ item.key }}
+      with_dict: '{{ ifcs }}'
+    - name: Create VRFs and assign to them # TBD: merge with prev, for now it remains split for debugging purpose.
+      vars:
+        vrf: '{{ item.value.ifp }}'
+      shell: | # TBD: this is a lazy variant, should be split into separate commands
+        ip link add {{ vrf }} type vrf table {{ idx+1 }} &&
+        ip link set dev {{ vrf }} up &&
+        ip link set dev {{ item.key }} master {{ vrf }} &&
+        ip rule add iif {{ vrf }} table {{ idx+1 }} &&
+        ip rule add oif {{ vrf }} table {{ idx+1 }}
+      with_dict: '{{ ifcs }}'
+      loop_control: # Note: assuming with_dict order is persistent, replace with list otherwise.
+        index_var: idx
+    - name: Set up cross-routes to peer VRFs
+      command:
+        ip route add {{ item.value.pip | ipsubnet(item.value.pmsk) }} via {{ item.value.gw }} vrf {{ item.value.ifp }}
+      with_dict: '{{ ifcs }}'

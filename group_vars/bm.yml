@@ -1,0 +1,8 @@
+# Be cautious to not touch management interface, usually eth0. Move this to group_vars (TBD):
+nics:
+  - eth1
+  - eth2
+  - eth3
+  - eth4
+  - eth5
+  - eth6

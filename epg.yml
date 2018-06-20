@@ -1,0 +1,65 @@
+---
+- set_fact:
+    phy: '{ {% for i in oitem.value -%}
+        "{{ i }}": {{ phys[ oitem.value[ i ].phy ] }}{%- if not loop.last -%}, {% endif -%}
+      {%- endfor %} }'
+    dom: '{ {% for i in oitem.value -%}
+        "{{ i }}": {{ doms[ oitem.value[ i ].dom ] }}{%- if not loop.last -%}, {% endif -%}
+      {%- endfor %} }'
+- aci_bd:
+    <<: &tn-ol
+      tenant: '{{ tnn }}'
+      output_level: '{{ output_level }}'
+    bd: &bd
+      '{{ pref.bd }}_{{ oitem.key }}_{{ item.key }}'
+    vrf: '{{ vrfn }}'
+  args: '{{ aci_vars }}'
+  with_dict: '{{ oitem.value }}'
+- aci_bd_subnet:
+    <<: *tn-ol
+    bd: *bd
+    gateway: '{{ item.value.gw }}'
+    mask: '{{ item.value.msk }}'
+  args: '{{ aci_vars }}'
+  with_dict: '{{ oitem.value }}'
+- aci_epg:
+    <<: *tn-ol
+    ap: &ap
+      '{{ pref.ap }}{{ oitem.key }}'
+    bd: *bd
+    epg: &epg
+      '{{ pref.epg }}{{ item.key }}'
+  args: '{{ aci_vars }}'
+  with_dict: '{{ oitem.value }}'
+- aci_epg_to_domain:
+    <<: *tn-ol
+    ap: *ap
+    epg: *epg
+    domain: '{{ dom[ item.key ].dom }}'
+    domain_type: '{{ dom[ item.key ].dom_type | default("phys")  }}'
+    encap: '{{ dom[ item.key ].encap | default(1) }}'
+  args: '{{ aci_vars }}'
+  with_dict: '{{ oitem.value }}'
+  when: intent == 'present'
+- aci_static_binding_to_epg:
+    <<: *tn-ol
+    ap: *ap
+    epg: *epg
+    pod_id: '{{ phy[ item.key ].pod }}'
+    leafs: '{{ phy[ item.key ].lf }}'
+    interface: '1/{{ phy[ item.key ].prt }}'
+    interface_mode: '{{ phy[ item.key ].prt_mode | default("untagged") }}'
+    encap_id: '{{ dom[ item.key ].encap | default(1) }}'
+  args: '{{ aci_vars }}'
+  with_dict: '{{ oitem.value }}'
+  when: intent == 'present'
+#- TBD: create custom contract
+- aci_epg_to_contract:
+    <<: *tn-ol
+    ap: *ap
+    epg: *epg
+    contract: default # TBD: custom
+    contract_type: '{{ item.value.role }}'
+  args: '{{ aci_vars }}'
+  with_dict: '{{ oitem.value }}'
+  when: intent == 'present'
