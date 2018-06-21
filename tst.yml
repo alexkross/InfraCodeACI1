@@ -1,7 +1,6 @@
 ---
 - hosts: bm1
   vars:
-    aps: '{{ tns[ tn ] }}'
     data: '{{ aps[ ap ][ epg ] }}' # do not reuse var name 'epg', bcs infinite recurion
     test: '{{ tsts[ data.tst ] }}'
     ip: '{{ test.ip }}' # or: '{%- for i, a in ifcs if a == ip -%}{ "{{ a }}": "{{ i }}" }{%- endfor -%}'

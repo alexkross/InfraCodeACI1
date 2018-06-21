@@ -1,0 +1,97 @@
+---
+before_script:
+  - date +%Y-%m-%dT%H-%M-%S
+after_script:
+  - date +%H-%M-%S
+#variables:
+  #CI_DEBUG_TRACE: "true"
+stages:
+  #- Check preconditions, i.e. resource usage. TBD.
+  - cln_bm
+  - cln_tst_pre
+  - mk_tst
+  - tst1
+  - tst2
+  - cln_tst_post
+  - cln_prd
+  - mk_prd
+.common1: &common1
+  retry: 0
+  tags:
+    - ansible
+cln_bm1:
+  <<: *common1
+  stage: cln_bm
+  script:
+    - ansible-playbook -f 1 bm.yml -e "tn=1 intent=absent" -e @vars/tst.yml
+cln_tst1_pre:
+  <<: *common1
+  stage: cln_tst_pre
+  script: &cln_tst
+    - ansible-playbook -f 1 phy.yml -e "tn=1 intent=absent" -e @vars/tst.yml
+    - ansible-playbook -f 1 tn.yml -e "tn=1 intent=absent" -e @vars/tst.yml
+    - ansible-playbook -f 1 dom.yml -e "tn=1 intent=absent" -e @vars/tst.yml
+cln_tst1_post:
+  <<: *common1
+  stage: cln_tst_post
+  script: *cln_tst
+cln_prd1:
+  <<: *common1
+  stage: cln_prd
+  script:
+    - ansible-playbook -f 1 phy.yml -e "tn=1 intent=absent" -e @vars/prd.yml
+    - ansible-playbook -f 1 tn.yml -e "tn=1 intent=absent" -e @vars/prd.yml
+    - ansible-playbook -f 1 dom.yml -e "tn=1 intent=absent" -e @vars/prd.yml
+  when: manual
+  allow_failure: false # blocking
+mk_tst1_dom:
+  <<: *common1
+  stage: mk_tst
+  script:
+    - ansible-playbook -f 1 dom.yml -e "tn=1 intent=present" -e @vars/tst.yml
+mk_tst1_tn:
+  <<: *common1
+  stage: mk_tst
+  script:
+    - ansible-playbook -f 1 tn.yml -e "tn=1 intent=present" -e @vars/tst.yml
+mk_tst1_phy:
+  <<: *common1
+  stage: mk_tst
+  script:
+    - ansible-playbook -f 1 phy.yml -e "tn=1 intent=present" -e @vars/tst.yml
+mk_tst1_bm:
+  <<: *common1
+  stage: mk_tst
+  script:
+    - ansible-playbook -f 1 bm.yml -e "tn=1 intent=present" -e @vars/tst.yml
+tst1:
+  <<: *common1
+  stage: tst1
+  script:
+    - ansible-playbook -f 1 tst.yml -e "tn=1 ap=a epg=1"
+tst2:
+  <<: *common1
+  stage: tst2
+  script:
+    - ansible-playbook -f 1 tst.yml -e "tn=1 ap=a epg=2"
+mk_prd1_dom:
+  <<: *common1
+  stage: mk_prd
+  script:
+    - ansible-playbook -f 1 dom.yml -e "tn=1 intent=present" -e @vars/prd.yml
+mk_prd1_tn:
+  <<: *common1
+  stage: mk_prd
+  script:
+    - ansible-playbook -f 1 tn.yml -e "tn=1 intent=present" -e @vars/prd.yml
+mk_prd1_phy:
+  <<: *common1
+  stage: mk_prd
+  script:
+    - ansible-playbook -f 1 phy.yml -e "tn=1 intent=present" -e @vars/prd.yml
+# This is a particular demo case:
+mk_prd1_bm:
+  <<: *common1
+  stage: mk_prd
+  script:
+    - ansible-playbook -f 1 bm.yml -e "tn=1 intent=present" -e @vars/prd.yml

@@ -1,7 +1,6 @@
 ---
 - hosts: bm1
   vars:
-    aps: '{{ tns[ tn ] }}'
     keys:
       - chassis.name
       - chassis.descr
@@ -19,7 +18,9 @@
           ip link set eth$i group default
         done
       ignore_errors: yes
-      #when: tn_pref == "Tst" # kills Prd too! Static routes injection fails anyway despite different VRFs.
+      #when: pref == "Tst" # kills Prd too! Static routes injection fails anyway despite different VRFs.
+    - meta: end_play
+      when: intent == "absent"
     - name: Prepare LLDP
       systemd:
         name: lldpd
@@ -50,7 +51,7 @@
       vars:
         tmp1: '{{ "[ { " ~ " }, { ".join( links ) ~ " } ]" }}'
         tmp2: '{{ tmp1 | selectattr( "key", "match", keys | join("|") ) | list }}'
-      set_fact: 
+      set_fact:
         uplinks: '{{ uplinks | combine({ item.dev: uplinks[item.dev] | combine({ item.key: item.val }) }) }}'
       with_list: '{{ tmp2 }}'
     - set_fact:

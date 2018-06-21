@@ -12,6 +12,8 @@ Consider these Ansible playbooks as a template/skeleton/sample that need customi
 - Vault`ed passwords placed in host_vars/.
 - Ansible configuraion somewere supposedly $HOME/.ansible.cfg.
 - Ansible inventory somewere supposedly $HOME/.ansible.hosts with appropriate options and group definitions.
+- Working GitLab installation with shell runner configured, tagged for ansible, registered, enabled/started and assinged to the project.
+- Reflected ansible environment into gitlab-runner home directory (/var/lib/gitlab-runner/ in my case). Proper permissions must be set.
 
 ## Topology
 

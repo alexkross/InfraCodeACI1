@@ -1,10 +1,10 @@
 ---
 - hosts: apic
   vars: # do not '| unique'
-    tenant: '{{ tns[ tn ] }}'
-    aps: '{{ tenant.keys() | map("extract", tenant) | list }}'
-    et: ' {% for ap in aps -%}{{ ap | map("extract", ap) | list }},{%- endfor -%}' # Do not strip initial whitespaces to disable JSON recognitions.
-    es: '[ {{ et[:-1] | trim }} ]' # Without this precise trick single container might result in tuple because trailing comma!
+    at: ' {% for ap in aps -%}{{ ap | map("extract", aps) | first }},{%- endfor -%}' # Keep initial whitespaces.
+    ats: '[ {{ at[:-1] | trim }} ]' # Without this precise trick single container might result in tuple because trailing comma!
+    et: ' {% for eps in ats -%}{%- for ep in eps -%}{{ ep | map("extract", eps) | first }},{%- endfor -%}{%- endfor -%}'
+    es: '[ {{ et[:-1] | trim }} ]' # The same.
     ps: '{{ es | flatten | map(attribute="phy") | map("extract", phys) | list }}'
     ds: '{{ es | flatten | map(attribute="dom") | map("extract", doms) | list }}'
   tasks:
@@ -12,7 +12,7 @@
         <<: &st-ol
           state: '{{ intent }}'
           output_level: '{{ output_level }}'
-        policy_group: '{{ item.0.ifpg }}' #&pg 
+        policy_group: '{{ item.0.ifpg }}' #&pg
         aep: '{{ item.1.aep }}'
         lag_type: leaf
         lldp_policy: LLDP:En
@@ -21,11 +21,16 @@
       with_together:
         - '{{ ps }}'
         - '{{ ds }}'
+      ignore_errors: '{{ intent == "absent" }}'
     - aci_interface_policy_leaf_profile: #&iflfp
         <<: *st-ol
         leaf_interface_profile: '{{ item.ifp }}'
       args: '{{ aci_vars }}'
       with_list: '{{ ps }}'
+      ignore_errors: '{{ intent == "absent" }}'
+    #- TBD: clear 'missing-target' created by aci_interface_selector_to_switch_policy_leaf_profile
+    - meta: end_play
+      when: intent == "absent"
     - aci_access_port_to_interface_policy_leaf_profile:
         <<: *st-ol
         leaf_interface_profile: '{{ item.ifp }}'

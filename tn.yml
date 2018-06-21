@@ -1,24 +1,33 @@
 ---
 - hosts: apic
   vars:
-    tnn: '{{ tn_pref }}{{ tn }}'
-    vrfn: '{{ pref.vrf }}{{ tn }}'
+    vrf: '{{ prefs.vrf }}{{ tn }}'
   tasks:
     - aci_tenant: &tn
         tenant: '{{ tnn }}'
         state: '{{ intent }}'
         output_level: '{{ output_level }}'
       args: '{{ aci_vars }}'
+      ignore_errors: '{{ intent == "absent" }}'
+    - meta: end_play
+      when: intent == "absent"
     - aci_ap:
         <<: *tn
-        ap: '{{ pref.ap }}{{ item.key }}'
+        ap: '{{ prefs.ap }}{{ item.key }}'
       args: '{{ aci_vars }}'
-      with_dict: '{{ tns[ tn ] }}'
+      with_dict: '{{ aps }}'
     - aci_vrf:
         <<: *tn
-        vrf: '{{ vrfn }}'
+        vrf: '{{ vrf }}'
       args: '{{ aci_vars }}'
     - include_tasks: epg.yml
-      with_dict: '{{ tns[ tn ] }}'
+      vars:
+        phy: '{ {% for i in oitem.value -%}
+            "{{ i }}": {{ phys[ oitem.value[ i ].phy ] }}{%- if not loop.last -%}, {% endif -%}
+          {%- endfor %} }'
+        dom: '{ {% for i in oitem.value -%}
+            "{{ i }}": {{ doms[ oitem.value[ i ].dom ] }}{%- if not loop.last -%}, {% endif -%}
+          {%- endfor %} }'
+      with_dict: '{{ aps }}'
       loop_control:
         loop_var: oitem

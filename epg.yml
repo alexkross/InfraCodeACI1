@@ -1,18 +1,11 @@
 ---
-- set_fact:
-    phy: '{ {% for i in oitem.value -%}
-        "{{ i }}": {{ phys[ oitem.value[ i ].phy ] }}{%- if not loop.last -%}, {% endif -%}
-      {%- endfor %} }'
-    dom: '{ {% for i in oitem.value -%}
-        "{{ i }}": {{ doms[ oitem.value[ i ].dom ] }}{%- if not loop.last -%}, {% endif -%}
-      {%- endfor %} }'
 - aci_bd:
     <<: &tn-ol
       tenant: '{{ tnn }}'
       output_level: '{{ output_level }}'
     bd: &bd
-      '{{ pref.bd }}_{{ oitem.key }}_{{ item.key }}'
-    vrf: '{{ vrfn }}'
+      '{{ prefs.bd }}_{{ oitem.key }}_{{ item.key }}'
+    vrf: '{{ vrf }}'
   args: '{{ aci_vars }}'
   with_dict: '{{ oitem.value }}'
 - aci_bd_subnet:
@@ -25,10 +18,10 @@
 - aci_epg:
     <<: *tn-ol
     ap: &ap
-      '{{ pref.ap }}{{ oitem.key }}'
+      '{{ prefs.ap }}{{ oitem.key }}'
     bd: *bd
     epg: &epg
-      '{{ pref.epg }}{{ item.key }}'
+      '{{ prefs.epg }}{{ item.key }}'
   args: '{{ aci_vars }}'
   with_dict: '{{ oitem.value }}'
 - aci_epg_to_domain:
@@ -36,7 +29,7 @@
     ap: *ap
     epg: *epg
     domain: '{{ dom[ item.key ].dom }}'
-    domain_type: '{{ dom[ item.key ].dom_type | default("phys")  }}'
+    domain_type: '{{ dom[ item.key ].dom_type | default("phys") }}'
     encap: '{{ dom[ item.key ].encap | default(1) }}'
   args: '{{ aci_vars }}'
   with_dict: '{{ oitem.value }}'

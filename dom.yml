@@ -4,7 +4,7 @@
     - set_fact:
         #phie: '{{ phie | default([]) + [[ item.key, item.value | list ]] }}'
         epgs: '{{ epgs | default([]) + item.value | map("extract", item.value) | list }}'
-      with_dict: '{{ tns[ tn ] }}'
+      with_dict: '{{ aps }}'
     #- set_fact:
     #    pflt: '{{ pflt | default([]) + ([ item.0 ] * item.1 | length) | zip(item.1) | list }}'
     #  with_list: '{{ phie }}'
@@ -22,6 +22,7 @@
         pool_type: '{{ item.encap_mode | default("vlan") }}'
       args: '{{ aci_vars }}'
       with_list: '{{ items }}'
+      ignore_errors: '{{ intent == "absent" }}'
     - aci_encap_pool_range:
         <<: *ep
         range_name: '{{ item.encap | default(1) }}'
@@ -30,6 +31,7 @@
         range_end: *enc
       args: '{{ aci_vars }}'
       with_list: '{{ items }}'
+      when: intent != "absent"
     - aci_domain: &dom
         <<: *st-ol
         domain: &dom_name
@@ -38,22 +40,24 @@
           '{{ item.dom_type | default("phys") }}'
       args: '{{ aci_vars }}'
       with_list: '{{ items }}'
+      ignore_errors: '{{ intent == "absent" }}'
     - aci_domain_to_vlan_pool:
         <<: *dom
         pool: *pool
         pool_allocation_mode: *pool_mode
       args: '{{ aci_vars }}'
       with_list: '{{ items }}'
-      when: intent == 'present'
+      when: intent != "absent"
     - aci_aep: &aep
         <<: *st-ol
         aep: '{{ item.aep }}'
       args: '{{ aci_vars }}'
       with_list: '{{ items }}'
+      ignore_errors: '{{ intent == "absent" }}'
     - aci_aep_to_domain:
         <<: *aep
         domain: *dom_name
         domain_type: *dom_type
       args: '{{ aci_vars }}'
       with_list: '{{ items }}'
-      when: intent == 'present'
+      when: intent != "absent"
