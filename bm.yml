@@ -50,7 +50,7 @@
       vars:
         tmp1: '{{ "[ { " ~ " }, { ".join( links ) ~ " } ]" }}'
         tmp2: '{{ tmp1 | selectattr( "key", "match", keys | join("|") ) | list }}'
-      set_fact: 
+      set_fact:
         uplinks: '{{ uplinks | combine({ item.dev: uplinks[item.dev] | combine({ item.key: item.val }) }) }}'
       with_list: '{{ tmp2 }}'
     - set_fact:

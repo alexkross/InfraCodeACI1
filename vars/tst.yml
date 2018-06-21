@@ -2,22 +2,22 @@
 tn_pref: Tst
 phys:
   "a1":
-    pod: 2
-    lf: 303
+    pod: 1
+    lf: 101
     prt: 46
     # [default] prt_mode(aka mode): untagged
     ifpg: &ifpg
       '{{ tnn }}_{{ tns[ tn ] | list | join(":") }}'
     ifp: '{{ tnn }}_a1'
-    swp: i9Leaf3_Copper # TBD: derive
+    swp: Leaf1 # TBD: derive
   "a2":
-    pod: 2
-    lf: 304
+    pod: 1
+    lf: 102
     prt: 46
     # [default] prt_mode(aka mode): untagged
     ifpg: *ifpg
     ifp: '{{ tnn }}_a2'
-    swp: i9Leaf4_Copper # TBD: derive
+    swp: Leaf2 # TBD: derive
 doms: # do not force to cast to '|int' allowing a name be symbolic
   "1":
     dom: &name

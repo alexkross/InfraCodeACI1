@@ -12,7 +12,7 @@
         <<: &st-ol
           state: '{{ intent }}'
           output_level: '{{ output_level }}'
-        policy_group: '{{ item.0.ifpg }}' #&pg 
+        policy_group: '{{ item.0.ifpg }}' #&pg
         aep: '{{ item.1.aep }}'
         lag_type: leaf
         lldp_policy: LLDP:En
